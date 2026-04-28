@@ -9,7 +9,7 @@ slack_token = os.environ.get('SLACK_TOKEN')
 target_channel = os.environ.get('GROWTH_CHANNEL_ID')
 
 # Paste your "Publish to web" URL here
-SHEET_URL = "YOUR_PUBLISHED_GOOGLE_SHEET_URL"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM1euZymtjxn03QmcF-sHQBcjw0SaLhUP6vOgXEFILWdIibeEdjgqAUBF6pwqZbNEKOpf6Z0GzXj2D/pubhtml?gid=594728950&single=true"
 
 client = WebClient(token=slack_token)
 
