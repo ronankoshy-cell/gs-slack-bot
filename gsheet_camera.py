@@ -24,12 +24,19 @@ def take_screenshot_and_send():
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             
-            # Go to the published sheet
+            # Go to the published sheet (removed networkidle to prevent timeouts)
+            print("Navigating to URL...")
             page.goto(SHEET_URL)
             
-            # Wait for the table to load, then take a screenshot of JUST the table element
-            page.wait_for_selector("table.waffle")
-            page.locator("table.waffle").screenshot(path=png_filename)
+            # Give Google's internal JavaScript 3 seconds to finish drawing the cells
+            print("Waiting for cells to render...")
+            page.wait_for_timeout(3000)
+            
+            # Find the table that actually contains your data headers and take a picture of it.
+            # .last ensures it grabs the innermost data table, ignoring any invisible layout wrappers.
+            print("Taking screenshot of the data table...")
+            data_table = page.locator("table").filter(has_text="Budget").last
+            data_table.screenshot(path=png_filename)
             
             browser.close()
             print("Screenshot captured successfully!")
@@ -40,12 +47,13 @@ def take_screenshot_and_send():
             channel=target_channel,
             file=png_filename,
             title="Google Sheets Exact Snapshot",
-            initial_comment="📊 Hi Team, Sharing the CM View."
+            initial_comment="📊 Hi Team, Sharing the CM View"
         )
         print("SUCCESS: Google Sheets PNG relayed to target channel.")
         
         time.sleep(3) # Slack API protection
-        os.remove(png_filename)
+        if os.path.exists(png_filename):
+            os.remove(png_filename)
         
     except Exception as e:
         print(f"CRITICAL ERROR: {e}")
