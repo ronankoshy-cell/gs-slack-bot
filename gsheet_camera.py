@@ -28,8 +28,8 @@ def take_screenshot_and_send():
             page.goto(SHEET_URL)
             
             # Wait for the table to load, then take a screenshot of JUST the table element
-            page.wait_for_selector("table")
-            page.locator("table").screenshot(path=png_filename)
+            page.wait_for_selector("table.waffle")
+            page.locator("table.waffle").screenshot(path=png_filename)
             
             browser.close()
             print("Screenshot captured successfully!")
