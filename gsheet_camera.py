@@ -22,21 +22,21 @@ def take_screenshot_and_send():
         print("Opening browser...")
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
             
-            # Go to the published sheet (removed networkidle to prevent timeouts)
+            # Set a standard window size so we don't capture massive amounts of empty white space
+            context = browser.new_context(viewport={'width': 800, 'height': 600})
+            page = context.new_page()
+            
             print("Navigating to URL...")
             page.goto(SHEET_URL)
             
-            # Give Google's internal JavaScript 3 seconds to finish drawing the cells
-            print("Waiting for cells to render...")
-            page.wait_for_timeout(3000)
+            # Wait a full 5 seconds to guarantee Google is completely done drawing the screen
+            print("Waiting 5 seconds for cells to render...")
+            page.wait_for_timeout(5000)
             
-            # Find the table that actually contains your data headers and take a picture of it.
-            # .last ensures it grabs the innermost data table, ignoring any invisible layout wrappers.
-            print("Taking screenshot of the data table...")
-            data_table = page.locator("table").filter(has_text="Budget").last
-            data_table.screenshot(path=png_filename)
+            # Take a full photograph of the webpage—no locators, no searching!
+            print("Taking full page snapshot...")
+            page.screenshot(path=png_filename, full_page=True)
             
             browser.close()
             print("Screenshot captured successfully!")
@@ -47,7 +47,7 @@ def take_screenshot_and_send():
             channel=target_channel,
             file=png_filename,
             title="Google Sheets Exact Snapshot",
-            initial_comment="📊 Hi Team, Sharing the CM View"
+            initial_comment="📊 Hi Team, Sharing the CM View."
         )
         print("SUCCESS: Google Sheets PNG relayed to target channel.")
         
