@@ -1,0 +1,33 @@
+name: GSheets Exact PNG Relay
+
+on:
+  workflow_dispatch: 
+
+jobs:
+  relay_gsheets:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        # Install the Slack SDK and Playwright
+        run: |
+          python -m pip install --upgrade pip
+          pip install slack_sdk playwright
+          
+      - name: Install Headless Browser
+        # This command installs the invisible Chrome browser that takes the picture
+        run: playwright install chromium 
+
+      - name: Run GSheets Camera Script
+        env:
+          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+          GROWTH_CHANNEL_ID: ${{ secrets.GROWTH_CHANNEL_ID }}
+        run: python gsheet_camera.py
