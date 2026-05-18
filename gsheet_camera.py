@@ -3,7 +3,7 @@ import sys
 import time
 from playwright.sync_api import sync_playwright
 from slack_sdk import WebClient
-from PIL import Image
+from PIL import Image, ImageDraw
 
 # 1. Setup Environment Variables
 slack_token = os.environ.get('SLACK_TOKEN')
@@ -26,17 +26,25 @@ REPORTS = {
 client = WebClient(token=slack_token)
 
 def crop_whitespace_robust(image_path):
-    """Accurately isolates the data table and trims the surrounding empty space."""
+    """Accurately isolates the data table while ignoring edge artifacts."""
     print(f"Applying robust smart crop to {image_path}...")
     im = Image.open(image_path).convert('RGB')
+    width, height = im.size
     
-    # Convert to grayscale to simplify analysis
+    # Convert to grayscale
     grey_im = im.convert('L')
     
-    # CRITICAL FIX: Inverted Thresholding
-    # If a pixel is light (background), turn it Black (0) so the cropper ignores it.
-    # If a pixel is dark (text, borders, colored cells), turn it White (255) so the cropper targets it.
+    # Inverted Threshold: Light (background) -> 0 (Black), Dark (data) -> 255 (White)
     inverted_mask = grey_im.point(lambda p: 0 if p > 240 else 255)
+    
+    # CRITICAL FIX: The "Edge Mask"
+    # We draw a 10-pixel black border on the mask to force the cropper to ignore 
+    # any stray iframe/browser borders on the extreme edges of the screen.
+    draw = ImageDraw.Draw(inverted_mask)
+    draw.rectangle([0, 0, width, 10], fill=0)             # Top edge
+    draw.rectangle([0, 0, 10, height], fill=0)            # Left edge
+    draw.rectangle([width - 10, 0, width, height], fill=0) # Right edge
+    draw.rectangle([0, height - 10, width, height], fill=0)# Bottom edge
     
     # Find the bounding box of the active data (non-black pixels)
     bbox = inverted_mask.getbbox()
@@ -86,7 +94,7 @@ def take_screenshots_and_send():
                 print("Taking raw snapshot...")
                 page.screenshot(path=png_filename, full_page=True)
                 
-                # Trim the whitespace from the raw screenshot using the correctly inverted math
+                # Trim the whitespace from the raw screenshot
                 crop_whitespace_robust(png_filename)
 
                 # Upload the perfectly cropped PNG to Slack
