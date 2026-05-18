@@ -3,15 +3,13 @@ import sys
 import time
 from playwright.sync_api import sync_playwright
 from slack_sdk import WebClient
-from PIL import Image, ImageChops
+from PIL import Image
 
 # 1. Setup Environment Variables
 slack_token = os.environ.get('SLACK_TOKEN')
 target_channel = os.environ.get('GROWTH_CHANNEL_ID')
 
 # 2. Your Multi-Table Task List
-# I have kept your original URL for the CM_Summary. 
-# Just paste your second URL below!
 REPORTS = {
     "CM_Summary": {
         "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM1euZymtjxn03QmcF-sHQBcjw0SaLhUP6vOgXEFILWdIibeEdjgqAUBF6pwqZbNEKOpf6Z0GzXj2D/pubhtml?gid=594728950&single=true",
@@ -27,23 +25,32 @@ REPORTS = {
 
 client = WebClient(token=slack_token)
 
-def crop_whitespace(image_path):
-    """Automatically finds the table and crops out all the empty white space."""
-    print(f"Auto-cropping whitespace for {image_path}...")
+def crop_whitespace_robust(image_path):
+    """Smarter cropper that handles invisible artifacts by applying a white threshold."""
+    print(f"Applying robust smart crop to {image_path}...")
     im = Image.open(image_path)
     
-    # Convert to standard RGB to prevent transparency issues
-    rgb_im = im.convert('RGB')
+    # Handle alpha/transparency by pasting on solid white
+    if im.mode in ('RGBA', 'LA'):
+        bg_solid = Image.new('RGB', im.size, (255, 255, 255))
+        bg_solid.paste(im, mask=im.split()[3])
+        processed_im = bg_solid
+    else:
+        processed_im = im.convert('RGB')
+
+    # Convert to grayscale to simplify analysis
+    grey_im = processed_im.convert('L')
     
-    # Create a perfectly white background to compare against
-    bg = Image.new('RGB', rgb_im.size, (255, 255, 255))
-    diff = ImageChops.difference(rgb_im, bg)
+    # CRITICAL FIX: Thresholding
+    # If a pixel is lighter than 230 (mostly white), force it to pure white (255).
+    # If a pixel is darker than 230 (data/borders), make it pure black (0).
+    threshold_grey = grey_im.point(lambda p: 255 if p > 230 else 0)
     
-    # Find the exact bounding box of the table (non-white pixels)
-    bbox = diff.getbbox()
+    # Find the exact bounding box of the non-white area (data)
+    bbox = threshold_grey.getbbox()
     
     if bbox:
-        # Add a clean 15-pixel white border around the table for aesthetics
+        # Add a clean aesthetic border (top-left, bottom-right)
         padded_bbox = (
             max(bbox[0] - 15, 0),
             max(bbox[1] - 15, 0),
@@ -52,7 +59,9 @@ def crop_whitespace(image_path):
         )
         cropped_im = im.crop(padded_bbox)
         cropped_im.save(image_path)
-        print("Cropping successful!")
+        print("Robust cropping successful!")
+    else:
+        print("WARNING: Could not determine bounding box, skipping crop.")
 
 def take_screenshots_and_send():
     try:
@@ -85,8 +94,8 @@ def take_screenshots_and_send():
                 print("Taking raw snapshot...")
                 page.screenshot(path=png_filename, full_page=True)
                 
-                # Trim the whitespace from the raw screenshot
-                crop_whitespace(png_filename)
+                # Trim the whitespace from the raw screenshot using the ROBUST method
+                crop_whitespace_robust(png_filename)
 
                 # Upload the perfectly cropped PNG to Slack
                 print(f"Uploading {report_name} PNG to Slack...")
