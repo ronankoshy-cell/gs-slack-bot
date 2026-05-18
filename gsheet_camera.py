@@ -26,31 +26,23 @@ REPORTS = {
 client = WebClient(token=slack_token)
 
 def crop_whitespace_robust(image_path):
-    """Smarter cropper that handles invisible artifacts by applying a white threshold."""
+    """Accurately isolates the data table and trims the surrounding empty space."""
     print(f"Applying robust smart crop to {image_path}...")
-    im = Image.open(image_path)
+    im = Image.open(image_path).convert('RGB')
     
-    # Handle alpha/transparency by pasting on solid white
-    if im.mode in ('RGBA', 'LA'):
-        bg_solid = Image.new('RGB', im.size, (255, 255, 255))
-        bg_solid.paste(im, mask=im.split()[3])
-        processed_im = bg_solid
-    else:
-        processed_im = im.convert('RGB')
-
     # Convert to grayscale to simplify analysis
-    grey_im = processed_im.convert('L')
+    grey_im = im.convert('L')
     
-    # CRITICAL FIX: Thresholding
-    # If a pixel is lighter than 230 (mostly white), force it to pure white (255).
-    # If a pixel is darker than 230 (data/borders), make it pure black (0).
-    threshold_grey = grey_im.point(lambda p: 255 if p > 230 else 0)
+    # CRITICAL FIX: Inverted Thresholding
+    # If a pixel is light (background), turn it Black (0) so the cropper ignores it.
+    # If a pixel is dark (text, borders, colored cells), turn it White (255) so the cropper targets it.
+    inverted_mask = grey_im.point(lambda p: 0 if p > 240 else 255)
     
-    # Find the exact bounding box of the non-white area (data)
-    bbox = threshold_grey.getbbox()
+    # Find the bounding box of the active data (non-black pixels)
+    bbox = inverted_mask.getbbox()
     
     if bbox:
-        # Add a clean aesthetic border (top-left, bottom-right)
+        # Add a clean 15-pixel white border around the data
         padded_bbox = (
             max(bbox[0] - 15, 0),
             max(bbox[1] - 15, 0),
@@ -94,7 +86,7 @@ def take_screenshots_and_send():
                 print("Taking raw snapshot...")
                 page.screenshot(path=png_filename, full_page=True)
                 
-                # Trim the whitespace from the raw screenshot using the ROBUST method
+                # Trim the whitespace from the raw screenshot using the correctly inverted math
                 crop_whitespace_robust(png_filename)
 
                 # Upload the perfectly cropped PNG to Slack
