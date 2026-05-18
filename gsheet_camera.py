@@ -9,18 +9,27 @@ from PIL import Image, ImageChops
 slack_token = os.environ.get('SLACK_TOKEN')
 target_channel = os.environ.get('GROWTH_CHANNEL_ID')
 
-# Paste your "Publish to web" URL here
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM1euZymtjxn03QmcF-sHQBcjw0SaLhUP6vOgXEFILWdIibeEdjgqAUBF6pwqZbNEKOpf6Z0GzXj2D/pubhtml?gid=594728950&single=true"
-
-# Automatically inject Google's hidden parameters to remove the top header and bottom tabs
-if "&chrome=false" not in SHEET_URL:
-    SHEET_URL += "&chrome=false&widget=false&headers=false"
+# 2. Your Multi-Table Task List
+# I have kept your original URL for the CM_Summary. 
+# Just paste your second URL below!
+REPORTS = {
+    "CM_Summary": {
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM1euZymtjxn03QmcF-sHQBcjw0SaLhUP6vOgXEFILWdIibeEdjgqAUBF6pwqZbNEKOpf6Z0GzXj2D/pubhtml?gid=594728950&single=true",
+        "title": "Google Sheets Exact Snapshot - CM Summary",
+        "message": "📊 Hi Team, here is the latest CM Summary."
+    },
+    "Second_Report": {
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM1euZymtjxn03QmcF-sHQBcjw0SaLhUP6vOgXEFILWdIibeEdjgqAUBF6pwqZbNEKOpf6Z0GzXj2D/pubhtml?gid=943397354&single=true",
+        "title": "Google Sheets Exact Snapshot - Second Report",
+        "message": "📊 Hi Team, PFB MTD CM Summary"
+    }
+}
 
 client = WebClient(token=slack_token)
 
 def crop_whitespace(image_path):
     """Automatically finds the table and crops out all the empty white space."""
-    print("Auto-cropping whitespace...")
+    print(f"Auto-cropping whitespace for {image_path}...")
     im = Image.open(image_path)
     
     # Convert to standard RGB to prevent transparency issues
@@ -45,49 +54,63 @@ def crop_whitespace(image_path):
         cropped_im.save(image_path)
         print("Cropping successful!")
 
-def take_screenshot_and_send():
+def take_screenshots_and_send():
     try:
-        print("--- GSheets Headless Camera ---")
-        png_filename = "exact_cells_snapshot.png"
+        print("--- GSheets Headless Camera (Multi-URL) ---")
 
-        # 2. Fire up the headless browser and take the full-page picture
+        # 3. Fire up the headless browser
         print("Opening browser...")
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context(viewport={'width': 1200, 'height': 800})
             page = context.new_page()
             
-            print("Navigating to clean URL...")
-            page.goto(SHEET_URL)
-            
-            print("Waiting 5 seconds for cells to render...")
-            page.wait_for_timeout(5000)
-            
-            print("Taking raw snapshot...")
-            page.screenshot(path=png_filename, full_page=True)
-            
+            # Loop through every table in your REPORTS list
+            for report_name, data in REPORTS.items():
+                print(f"\n--- Processing {report_name} ---")
+                
+                # Automatically inject Google's hidden parameters to clean the UI
+                target_url = data["url"]
+                if "&chrome=false" not in target_url:
+                    target_url += "&chrome=false&widget=false&headers=false"
+
+                png_filename = f"{report_name}_snapshot.png"
+                
+                print("Navigating to clean URL...")
+                page.goto(target_url)
+                
+                print("Waiting 5 seconds for cells to render...")
+                page.wait_for_timeout(5000)
+                
+                print("Taking raw snapshot...")
+                page.screenshot(path=png_filename, full_page=True)
+                
+                # Trim the whitespace from the raw screenshot
+                crop_whitespace(png_filename)
+
+                # Upload the perfectly cropped PNG to Slack
+                print(f"Uploading {report_name} PNG to Slack...")
+                client.files_upload_v2(
+                    channel=target_channel,
+                    file=png_filename,
+                    title=data["title"],
+                    initial_comment=data["message"]
+                )
+                print(f"SUCCESS: Clean Google Sheets PNG relayed to target channel.")
+                
+                # The crucial 3-second delay to prevent Slack API protection triggers
+                time.sleep(3) 
+                
+                # Delete the image before moving to the next report
+                if os.path.exists(png_filename):
+                    os.remove(png_filename)
+                    
             browser.close()
-
-        # 3. Trim the whitespace from the raw screenshot
-        crop_whitespace(png_filename)
-
-        # 4. Upload the perfectly cropped PNG to Slack
-        print("Uploading PNG to Slack...")
-        client.files_upload_v2(
-            channel=target_channel,
-            file=png_filename,
-            title="Google Sheets Exact Snapshot",
-            initial_comment="📊 Hi Team, here is the latest CM Summary."
-        )
-        print("SUCCESS: Clean Google Sheets PNG relayed to target channel.")
-        
-        time.sleep(3) # Slack API protection
-        if os.path.exists(png_filename):
-            os.remove(png_filename)
+            print("\nAll snapshots captured and sent successfully!")
         
     except Exception as e:
         print(f"CRITICAL ERROR: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
-    take_screenshot_and_send()
+    take_screenshots_and_send()
