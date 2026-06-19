@@ -12,12 +12,12 @@ target_channel = os.environ.get('GROWTH_CHANNEL_ID')
 # 2. Your Multi-Table Task List
 REPORTS = {
     "CM_Summary": {
-        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM1euZymtjxn03QmcF-sHQBcjw0SaLhUP6vOgXEFILWdIibeEdjgqAUBF6pwqZbNEKOpf6Z0GzXj2D/pubhtml?gid=594728950&single=true",
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRm7CnIXzIUWjT9VBt1eUHchBFa-vFVPZymb23TeQs39EbTbfCupe2xFgpV1UlyyqzwELVg73CXfRYa/pubhtml?gid=594728950&single=true",
         "title": "Google Sheets Exact Snapshot - CM Summary",
         "message": "📊 Hi Team, here is the latest CM Summary."
     },
     "Second_Report": {
-        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM1euZymtjxn03QmcF-sHQBcjw0SaLhUP6vOgXEFILWdIibeEdjgqAUBF6pwqZbNEKOpf6Z0GzXj2D/pubhtml?gid=943397354&single=true",
+        "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRm7CnIXzIUWjT9VBt1eUHchBFa-vFVPZymb23TeQs39EbTbfCupe2xFgpV1UlyyqzwELVg73CXfRYa/pubhtml?gid=943397354&single=true",
         "title": "Google Sheets Exact Snapshot - Second Report",
         "message": "📊 Hi Team, PFB MTD CM Summary"
     }
